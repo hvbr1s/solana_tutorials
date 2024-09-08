@@ -112,8 +112,3 @@
 ## Testing in Near-Live Conditions
 
 After deploying your programs and generating the IDL and `.so` files, you can test them in near-live conditions using a TypeScript test suite like [BankRun](https://www.youtube.com/watch?v=2DVudyfP5bQ)
-
-## Deployed programs ID on devnet:
-
-Manifest -> 8p6eMVgc7TmwFHSKgvpVUdAs2anR6U7EqR7J8RtQy7Zq
-Wrapper -> CyBtNcXwi7RURKCGv8H8nn9r8mKtRgSL4CZyLpxqRK9u
