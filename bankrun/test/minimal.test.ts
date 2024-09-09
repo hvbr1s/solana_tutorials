@@ -28,7 +28,7 @@ test("custom program deposit", async () => {
     );
 
     // Set up the initial balance for the payer account (in lamports)
-    const initialLamports = 42_000_000;
+    const initialLamports = 1_000_000_000;
     const payerPubKey = new PublicKey('MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms')
     
     // Define the payer account with its initial state
@@ -60,7 +60,9 @@ test("custom program deposit", async () => {
     const latestBlockhash = context.lastBlockhash;
   
     // The deposit instruction index is 2 according to the IDL
-    const instructionIndex = 2;
+    const depositInstruction = idl.instructions.find(ix => ix.name === 'Deposit');
+    const instructionIndex = depositInstruction ? idl.instructions.indexOf(depositInstruction):2;
+    console.log(`Instruction index -> ${instructionIndex}`)
   
     // Create the deposit instruction
     const depositIx: TransactionInstruction = {
