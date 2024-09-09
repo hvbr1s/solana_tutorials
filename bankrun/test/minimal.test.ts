@@ -1,30 +1,39 @@
 import { start, AddedAccount, AddedProgram } from "solana-bankrun";
 import { PublicKey, Transaction, SystemProgram, Keypair, TransactionInstruction } from "@solana/web3.js";
-import idl from "../idl/<>.json"
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import idl from "../idl/manifest.json"
 
 test("custom program deposit", async () => {
-    const programId = new PublicKey('<>');
+    // Define the program ID (public key) for the custom program
+    const programId = new PublicKey('8p6eMVgc7TmwFHSKgvpVUdAs2anR6U7EqR7J8RtQy7Zq');
+    
+    // Create an object representing the custom program to be added to the test environment
     const customProgram: AddedProgram = {
       programId: programId,
       name: "manifest"
     };
 
-    // Find the index of the 'deposit' instruction in the IDL
-    const depositInstruction = idl.instructions.find(ix => ix.name === 'Deposit');
-    const instructionIndex = depositInstruction ? idl.instructions.indexOf(depositInstruction):0;
-    console.log(`Instruction index -> ${instructionIndex}`)
+    // Create keypairs for the payer and market
+    const payerKeypair = new Keypair();
+    const marketKeypair = new Keypair();
 
-    const traderKeypair = new Keypair();
-    const initialLamports = 42_000_000;
-
-    // Generate a PDA for the trader account
-    const [traderPDA, _] = await PublicKey.findProgramAddress(
-        [Buffer.from("trader"), traderKeypair.publicKey.toBuffer()],
+    // Create public keys for other accounts
+    const mint = PublicKey.unique()
+    const traderToken = PublicKey.unique()
+    
+    // Generate the vault PDA
+    const [vault] = await PublicKey.findProgramAddress(
+        [Buffer.from("vault"), marketKeypair.publicKey.toBuffer(), mint.toBuffer()],
         programId
     );
 
-    const trader : AddedAccount = {
-        address: traderKeypair.publicKey,
+    // Set up the initial balance for the payer account (in lamports)
+    const initialLamports = 42_000_000;
+    const payerPubKey = new PublicKey('MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms')
+    
+    // Define the payer account with its initial state
+    const payer: AddedAccount = {
+        address: payerPubKey,
         info: {
             data: Buffer.alloc(0),
             executable: false,
@@ -33,61 +42,62 @@ test("custom program deposit", async () => {
         }
     }
 
-    const context = await start([customProgram], [trader]);
+    // Define the market account with its initial state
+    const marketAccountSize = 1000; // Replace with the actual size needed for your market account
+    const market: AddedAccount = {
+        address: marketKeypair.publicKey,
+        info: {
+            data: Buffer.alloc(marketAccountSize),
+            executable: false,
+            lamports: initialLamports,
+            owner: programId, // Set the owner to your program ID
+        }
+    }
+
+    // Start the test environment with the custom program, payer account, and market account
+    const context = await start([customProgram], [payer, market]);
     const client = context.banksClient;
     const latestBlockhash = context.lastBlockhash;
-
-    // First, initialize the trader account
-    const initializeIx = new TransactionInstruction({
-        programId: programId,
-        keys: [
-            { pubkey: traderKeypair.publicKey, isSigner: true, isWritable: true },
-            { pubkey: traderPDA, isSigner: false, isWritable: true },
-            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        ],
-        data: Buffer.from([0]) 
-    });
-
-    let tx = new Transaction().add(initializeIx);
-    tx.recentBlockhash = latestBlockhash;
-    tx.feePayer = traderKeypair.publicKey;
-    tx.sign(traderKeypair);
-
-    await client.processTransaction(tx);
-
-
-    // Set up parameters for the deposit instruction
-    const amount = 1000000; // amount in lamports
-    const isBase = true; // flag to indicate if it's a base token
   
-    // Construct the instruction data buffer
-    const instructionData = Buffer.alloc(10);
-    instructionData.writeUInt8(instructionIndex, 0);
-    instructionData.writeBigUInt64LE(BigInt(amount), 1);
-    instructionData.writeUInt8(isBase ? 1 : 0, 9);
-
+    // The deposit instruction index is 2 according to the IDL
+    const instructionIndex = 2;
+  
+    // Create the deposit instruction
     const depositIx: TransactionInstruction = {
         programId: programId,
         keys: [
-          { pubkey: traderKeypair.publicKey, isSigner: true, isWritable: true },
-          { pubkey: traderPDA, isSigner: false, isWritable: true },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+            { pubkey: payerKeypair.publicKey, isSigner: true, isWritable: true },
+            { pubkey: marketKeypair.publicKey, isSigner: false, isWritable: true },
+            { pubkey: traderToken, isSigner: false, isWritable: true },
+            { pubkey: vault, isSigner: false, isWritable: true },
+            { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+            { pubkey: mint, isSigner: false, isWritable: false },
         ],
-        data: instructionData
+        data: Buffer.from([instructionIndex]) // The instruction index is the only data needed
     };
-
-    tx = new Transaction().add(depositIx);
+  
+    // Create a new transaction and add the deposit instruction
+    const tx = new Transaction().add(depositIx);
     tx.recentBlockhash = latestBlockhash;
-    tx.feePayer = traderKeypair.publicKey;
-    tx.sign(traderKeypair);
-
+    tx.feePayer = payerKeypair.publicKey;
+    tx.sign(payerKeypair);
+  
+    // Process the transaction
     try {
         const txResult = await client.processTransaction(tx);
         console.log('Transaction result:', txResult);
-        
-        const updatedTraderInfo = await client.getAccount(traderPDA);
-        console.log('Updated trader info:', updatedTraderInfo);
-        
+      
+        // Fetch the updated account info
+        const updatedPayerInfo = await client.getAccount(payerKeypair.publicKey);
+        const updatedMarketInfo = await client.getAccount(marketKeypair.publicKey);
+        const updatedTraderTokenInfo = await client.getAccount(traderToken);
+        const updatedVaultInfo = await client.getAccount(vault);
+      
+        console.log('Updated payer info:', updatedPayerInfo);
+        console.log('Updated market info:', updatedMarketInfo);
+        console.log('Updated trader token info:', updatedTraderTokenInfo);
+        console.log('Updated vault info:', updatedVaultInfo);
+      
     } catch (error) {
         console.error('Error processing transaction:', error);
         throw error;
