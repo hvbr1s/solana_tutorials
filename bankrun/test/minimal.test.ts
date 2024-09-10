@@ -1,5 +1,5 @@
 import { start, AddedAccount, AddedProgram } from "solana-bankrun";
-import { PublicKey, Transaction, SystemProgram, Keypair, TransactionInstruction } from "@solana/web3.js";
+import { PublicKey, Transaction, SystemProgram, Keypair, TransactionInstruction, Connection } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import idl from "../idl/manifest.json"
 
@@ -22,25 +22,17 @@ test("custom program deposit", async () => {
 
     ////////////////////////////////////////////////////////////
 
-    // Create keypairs for the payer and market
-    const payerKeypair = new Keypair();
-    const marketKeypair = new Keypair();
 
-    // Create public keys for other accounts
+    // Simulating token mint and token
     const mint = PublicKey.unique()
     const traderToken = PublicKey.unique()
     
-    // Generate the vault PDA
-    const [vault] = await PublicKey.findProgramAddress(
-        [Buffer.from("vault"), marketKeypair.publicKey.toBuffer(), mint.toBuffer()],
-        programId
-    );
-
     // Set up the initial balance for the payer account (in lamports)
     const initialLamports = 1_000_000_000;
     const payerPubKey = new PublicKey('MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms')
     
     // Define the payer account with its initial state
+    const payerKeypair = new Keypair();
     const payer: AddedAccount = {
         address: payerPubKey,
         info: {
@@ -52,6 +44,7 @@ test("custom program deposit", async () => {
     }
 
     // Define the market account with its initial state
+    const marketKeypair = new Keypair();
     const marketAccountSize = 1000;
     const market: AddedAccount = {
         address: marketKeypair.publicKey,
@@ -62,6 +55,12 @@ test("custom program deposit", async () => {
             owner: programId, // Set the owner to your program ID
         }
     }
+
+    // Generate the vault PDA
+    const [vault] = await PublicKey.findProgramAddressSync(
+        [Buffer.from("vault"), marketKeypair.publicKey.toBuffer(), mint.toBuffer()],
+        programId
+    );
 
     // Start the test environment with the custom program, payer account, and market account
     const context = await start([customProgram], [payer, market]);
@@ -90,6 +89,9 @@ test("custom program deposit", async () => {
   
     // Process the transaction
     try {
+        console.log('Simulating the transaction!')
+        const simRes = await client.simulateTransaction(tx);
+        console.log(`Simulation results: ${simRes.result}`)
         const txResult = await client.processTransaction(tx);
         console.log('Transaction result:', txResult);
       
