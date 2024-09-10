@@ -1,6 +1,6 @@
-# How to deploy a Solana program without Anchor
+# How to deploy a Solana program without Anchor ⚓❌
 
-[![YouTube Video](https://img.youtube.com/vi/J6oSNwncw8o/0.jpg)](https://www.youtube.com/watch?v=J6oSNwncw8o)
+[![YouTube Video](https://img.youtube.com/vi/T-Q9_Nq4CZg/0.jpg)](https://www.youtube.com/watch?v=T-Q9_Nq4CZg)
 
 ## Installed Prerequisites
 
