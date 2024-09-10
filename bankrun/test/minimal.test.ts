@@ -1,7 +1,68 @@
 import { start, AddedAccount, AddedProgram } from "solana-bankrun";
-import { PublicKey, Transaction, SystemProgram, Keypair, TransactionInstruction, Connection } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { PublicKey, Transaction, SystemProgram, Keypair, TransactionInstruction } from "@solana/web3.js";
+import {
+    TOKEN_PROGRAM_ID,
+    getAssociatedTokenAddressSync,
+    AccountLayout,
+  } from "@solana/spl-token";
 import idl from "../idl/manifest.json"
+
+test("simulate mint and ATA creation", async () => {
+    // Define the owner and the mint address (USDC in this case)
+    const owner = PublicKey.unique(); // Simulated unique public key for the owner
+    const usdcMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+  
+    // Create the associated token account (ATA) for the owner
+    const ata = getAssociatedTokenAddressSync(usdcMint, owner, true);
+  
+    // Simulate minting 1,000,000,000 USDC to the ATA (use BigInt for large values)
+    const usdcToOwn = 1_000_000_000_000n; // Amount in smallest denomination (decimals adjusted)
+  
+    // Create token account data using Buffer
+    const ACCOUNT_SIZE = AccountLayout.span; // Ensure the correct account size
+    const tokenAccData = Buffer.alloc(ACCOUNT_SIZE);
+  
+    // Encode the token account data for the ATA using the AccountLayout
+    AccountLayout.encode(
+      {
+        mint: usdcMint,              // The token mint (USDC)
+        owner,                       // Owner of the ATA
+        amount: usdcToOwn,           // Balance in the token account
+        delegateOption: 0,           // No delegate set
+        delegate: PublicKey.default, // Default public key for delegate
+        delegatedAmount: 0n,         // No delegated amount
+        state: 1,                    // Account is initialized
+        isNativeOption: 0,           // Not a native account
+        isNative: 0n,                // No SOL in the account (native lamports)
+        closeAuthorityOption: 0,     // No close authority set
+        closeAuthority: PublicKey.default,
+      },
+      tokenAccData,
+    );
+  
+    // Initialize a test environment with the ATA preloaded with the token data
+    const context = await start(
+      [],
+      [
+        {
+          address: ata, // The address of the associated token account (ATA)
+          info: {
+            lamports: 1_000_000_000, // Simulating 1 SOL in the account for rent exemption
+            data: tokenAccData,      // Pre-encoded account data for the token account
+            owner: TOKEN_PROGRAM_ID, // Token program owns the account
+            executable: false,       // Not an executable account
+          },
+        },
+      ],
+    );
+  
+    // Access the test environment's client and fetch the raw account data
+    const client = context.banksClient;
+    const rawAccount = await client.getAccount(ata); // Get the token account data
+  
+    // Print the fetched account data to simulate the result
+    console.log("Simulated ATA and Mint Account:", rawAccount);
+  });
 
 test("custom program deposit", async () => {
 
