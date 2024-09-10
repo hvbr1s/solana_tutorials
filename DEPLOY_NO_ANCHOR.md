@@ -1,4 +1,4 @@
-# How to deploy a Solana program without Anchor ⚓❌
+# How to Deploy a Solana Program without Anchor ⚓❌
 
 [![YouTube Video](https://img.youtube.com/vi/T-Q9_Nq4CZg/0.jpg)](https://www.youtube.com/watch?v=T-Q9_Nq4CZg)
 
