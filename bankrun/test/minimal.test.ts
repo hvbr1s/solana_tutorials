@@ -4,6 +4,8 @@ import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import idl from "../idl/manifest.json"
 
 test("custom program deposit", async () => {
+
+    //// HOW TO LOAD A PROGRAM INTO YOUR TEST SUITE ////
     // Define the program ID (public key) for the custom program
     const programId = new PublicKey('8p6eMVgc7TmwFHSKgvpVUdAs2anR6U7EqR7J8RtQy7Zq');
     
@@ -12,6 +14,13 @@ test("custom program deposit", async () => {
       programId: programId,
       name: "manifest"
     };
+
+    // Find the function you want to call
+    const depositInstruction = idl.instructions.find(ix => ix.name === 'Deposit');
+    const instructionIndex = depositInstruction ? idl.instructions.indexOf(depositInstruction):2;
+    console.log(`Instruction index -> ${instructionIndex}`)
+
+    ////////////////////////////////////////////////////////////
 
     // Create keypairs for the payer and market
     const payerKeypair = new Keypair();
@@ -43,7 +52,7 @@ test("custom program deposit", async () => {
     }
 
     // Define the market account with its initial state
-    const marketAccountSize = 1000; // Replace with the actual size needed for your market account
+    const marketAccountSize = 1000;
     const market: AddedAccount = {
         address: marketKeypair.publicKey,
         info: {
@@ -58,11 +67,6 @@ test("custom program deposit", async () => {
     const context = await start([customProgram], [payer, market]);
     const client = context.banksClient;
     const latestBlockhash = context.lastBlockhash;
-  
-    // The deposit instruction index is 2 according to the IDL
-    const depositInstruction = idl.instructions.find(ix => ix.name === 'Deposit');
-    const instructionIndex = depositInstruction ? idl.instructions.indexOf(depositInstruction):2;
-    console.log(`Instruction index -> ${instructionIndex}`)
   
     // Create the deposit instruction
     const depositIx: TransactionInstruction = {
