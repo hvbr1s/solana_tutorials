@@ -1,5 +1,8 @@
 # How to Deploy a Solana Program on Localnet with Anchor ⚓    
 
+[![YouTube Video](https://img.youtube.com/vi/J6oSNwncw8o/0.jpg)](https://www.youtube.com/watch?v=J6oSNwncw8o)
+
+
 ## Installed Prerequisites
 
 - Git 
