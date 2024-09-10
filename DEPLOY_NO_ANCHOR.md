@@ -9,7 +9,7 @@
 - Cargo
 - Solana CLI
 
-⚠️ Please note this setup is **not** using Ancho. If your project **is** using Anchor, please use [this tutorial](https://github.com/hvbr1s/solana_tutorials/blob/main/DEPLOY_WITH_ANCHOR.md) instead.
+⚠️ Please note this setup is **not** using Anchor. If your project **is** using Anchor, please use [this tutorial](https://github.com/hvbr1s/solana_tutorials/blob/main/DEPLOY_WITH_ANCHOR.md) instead.
 
 ## Setup Steps
 
