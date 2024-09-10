@@ -111,4 +111,5 @@
 
 ## Testing in Near-Live Conditions
 
-After deploying your programs and generating the IDL and `.so` files, you can test them in near-live conditions using a TypeScript test suite like [BankRun](https://www.youtube.com/watch?v=2DVudyfP5bQ)
+- After deploying your programs and generating the IDL and `.so` files, you can test them in near-live conditions using a TypeScript test suite like [BankRun](https://www.youtube.com/watch?v=2DVudyfP5bQ)
+- Please see [this code](https://github.com/hvbr1s/solana_tutorials/blob/main/bankrun/test/minimal.test.ts) for a basic example.
