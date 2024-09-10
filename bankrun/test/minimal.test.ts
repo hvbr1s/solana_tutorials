@@ -61,10 +61,10 @@ test("simulate mint and ATA creation", async () => {
     const rawAccount = await client.getAccount(ata); // Get the token account data
   
     // Print the fetched account data to simulate the result
-    console.log("Simulated ATA and Mint Account:", rawAccount);
+    console.log("Simulated ATA and Mint Account:", rawAccount?.owner.toBase58());
   });
 
-test("custom program deposit", async () => {
+test("simulate custom program deposit", async () => {
 
     //// HOW TO LOAD A PROGRAM INTO YOUR TEST SUITE ////
     // Define the program ID (public key) for the custom program
@@ -85,8 +85,58 @@ test("custom program deposit", async () => {
 
 
     // Simulating token mint and token
-    const mint = PublicKey.unique()
-    const traderToken = PublicKey.unique()
+        // Define the owner and the mint address (USDC in this case)
+        const owner = PublicKey.unique(); // Simulated unique public key for the owner
+        const usdcMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+      
+        // Create the associated token account (ATA) for the owner
+        const ata = getAssociatedTokenAddressSync(usdcMint, owner, true);
+      
+        // Simulate minting 1,000,000,000 USDC to the ATA (use BigInt for large values)
+        const usdcToOwn = 1_000_000_000_000n; // Amount in smallest denomination (decimals adjusted)
+      
+        // Create token account data using Buffer
+        const ACCOUNT_SIZE = AccountLayout.span; // Ensure the correct account size
+        const tokenAccData = Buffer.alloc(ACCOUNT_SIZE);
+      
+        // Encode the token account data for the ATA using the AccountLayout
+        AccountLayout.encode(
+          {
+            mint: usdcMint,              // The token mint (USDC)
+            owner,                       // Owner of the ATA
+            amount: usdcToOwn,           // Balance in the token account
+            delegateOption: 0,           // No delegate set
+            delegate: PublicKey.default, // Default public key for delegate
+            delegatedAmount: 0n,         // No delegated amount
+            state: 1,                    // Account is initialized
+            isNativeOption: 0,           // Not a native account
+            isNative: 0n,                // No SOL in the account (native lamports)
+            closeAuthorityOption: 0,     // No close authority set
+            closeAuthority: PublicKey.default,
+          },
+          tokenAccData,
+        );
+            // Initialize a test environment with the ATA preloaded with the token data
+    const ctx = await start(
+        [],
+        [
+          {
+            address: ata, // The address of the associated token account (ATA)
+            info: {
+              lamports: 1_000_000_000, // Simulating 1 SOL in the account for rent exemption
+              data: tokenAccData,      // Pre-encoded account data for the token account
+              owner: TOKEN_PROGRAM_ID, // Token program owns the account
+              executable: false,       // Not an executable account
+            },
+          },
+        ],
+      );
+    
+      // Access the test environment's client and fetch the raw account data
+      const clt = ctx.banksClient;
+      const rawAccount = await clt.getAccount(ata); // Get the token account data
+
+      const traderToken = new PublicKey(`${rawAccount?.owner.toBase58()}`)
     
     // Set up the initial balance for the payer account (in lamports)
     const initialLamports = 1_000_000_000;
@@ -119,7 +169,7 @@ test("custom program deposit", async () => {
 
     // Generate the vault PDA
     const [vault] = await PublicKey.findProgramAddressSync(
-        [Buffer.from("vault"), marketKeypair.publicKey.toBuffer(), mint.toBuffer()],
+        [Buffer.from("vault"), marketKeypair.publicKey.toBuffer(), usdcMint.toBuffer()],
         programId
     );
 
@@ -137,7 +187,7 @@ test("custom program deposit", async () => {
             { pubkey: traderToken, isSigner: false, isWritable: true },
             { pubkey: vault, isSigner: false, isWritable: true },
             { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-            { pubkey: mint, isSigner: false, isWritable: false },
+            { pubkey: usdcMint, isSigner: false, isWritable: false },
         ],
         data: Buffer.from([instructionIndex]) // The instruction index is the only data needed
     };
