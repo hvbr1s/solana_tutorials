@@ -104,7 +104,7 @@ test("simulate custom program deposit with USDC to payer", async () => {
   const traderATA = getAssociatedTokenAddressSync(usdcMint, traderPubKey, true);
   console.log(`Trader ATA -> ${traderATA}`)
   
-  // Encode token account data
+  // Encode trader ATA data
   const ACCOUNT_SIZE = AccountLayout.span;
   const tokenAccData = Buffer.alloc(ACCOUNT_SIZE);
   AccountLayout.encode(
@@ -148,20 +148,20 @@ test("simulate custom program deposit with USDC to payer", async () => {
       data: marketAccountData,
       executable: false,
       lamports: initialLamports,
-      owner: programId, // Set the owner to the Manifest program ID
+      owner: programId,
     },
   };
 
   // Generate the vault PDA
-  const [vault] = PublicKey.findProgramAddressSync(
+  const [vaultPDA] = PublicKey.findProgramAddressSync(
     [Buffer.from("vault"), marketKeypair.publicKey.toBuffer(), usdcMint.toBuffer()],
     programId
   );
-  console.log(`PDA PubKey -> ${vault.toBase58()}`)
+  console.log(`PDA PubKey -> ${vaultPDA.toBase58()}`)
 
   // Initialize vault account at PDA
-  const vaultAccount :AddedAccount = {
-    address: vault,
+  const vault :AddedAccount = {
+    address: vaultPDA,
     info: {
       data: Buffer.alloc(AccountLayout.span),
       executable: false,
@@ -171,14 +171,14 @@ test("simulate custom program deposit with USDC to payer", async () => {
   };
 
   // Start the test environment with the custom program, payer account, market account, and vault account
-  const context = await start([customProgram], [trader, market, ATA, vaultAccount]);
+  const context = await start([customProgram], [trader, market, ATA, vault]);
   const client = context.banksClient;
 
   // Check initial account values
   const initialTraderInfo = await client.getAccount(traderPubKey);
   const initialMarketInfo = await client.getAccount(marketPubKey);
-  const initialTraderTokenInfo = await client.getAccount(traderPubKey);
-  const initialVaultInfo = await client.getAccount(vault);
+  const initialTraderTokenInfo = await client.getAccount(traderATA);
+  const initialVaultInfo = await client.getAccount(vaultPDA);
 
   console.log("Initial trader info:", initialTraderInfo);
   console.log("Initial market info:", initialMarketInfo);
@@ -193,7 +193,7 @@ test("simulate custom program deposit with USDC to payer", async () => {
       { pubkey: traderPubKey, isSigner: true, isWritable: true },
       { pubkey: marketPubKey, isSigner: false, isWritable: true },
       { pubkey: traderATA, isSigner: false, isWritable: true },
-      { pubkey: vault, isSigner: false, isWritable: true },
+      { pubkey: vaultPDA, isSigner: false, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: usdcMint, isSigner: false, isWritable: false },
     ],
@@ -221,7 +221,7 @@ test("simulate custom program deposit with USDC to payer", async () => {
     const updatedTraderInfo = await client.getAccount(traderPubKey);
     const updatedMarketInfo = await client.getAccount(marketPubKey);
     const updatedTraderTokenInfo = await client.getAccount(traderPubKey);
-    const updatedVaultInfo = await client.getAccount(vault);
+    const updatedVaultInfo = await client.getAccount(vaultPDA);
 
     console.log("Updated payer info:", updatedTraderInfo);
     console.log("Updated market info:", updatedMarketInfo);
