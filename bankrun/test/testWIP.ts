@@ -5,7 +5,6 @@ import {
     TOKEN_PROGRAM_ID,
     getAssociatedTokenAddressSync,
     AccountLayout,
-    createTransferInstruction
   } from "@solana/spl-token";
 import idl from "../idl/manifest.json"
 
@@ -60,7 +59,7 @@ test("simulate mint and ATA creation", async () => {
   
     // Access the test environment's client and fetch the raw account data
     const client = context.banksClient;
-    const rawAccount = await client.getAccount(ata); // Get the token account data
+    const rawAccount = await client.getAccount(ata);
   
     // Print the fetched account data to simulate the result
     console.log("Simulated ATA and Mint Account:", rawAccount?.owner.toBase58());
@@ -136,7 +135,7 @@ test("simulate custom program deposit with USDC to payer", async () => {
   // Define the market account with its initial state
   const marketKeypair = Keypair.generate();
   const DISCRIMINANT = new BN("4859840929024028656");
-  const marketAccountData = Buffer.alloc(1000); // Adjust size as needed
+  const marketAccountData = Buffer.alloc(1000);
   DISCRIMINANT.toArrayLike(Buffer, 'le', 8).copy(marketAccountData, 0);
   const market : AddedAccount = {
     address: marketKeypair.publicKey,
@@ -144,7 +143,7 @@ test("simulate custom program deposit with USDC to payer", async () => {
       data: marketAccountData,
       executable: false,
       lamports: initialLamports,
-      owner: programId, // Set the owner to the Manifest program ID
+      owner: programId,
     },
   };
 
@@ -181,7 +180,7 @@ test("simulate custom program deposit with USDC to payer", async () => {
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: usdcMint, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([instructionIndex]),
+    data: Buffer.from([instructionIndex]), 
   };
 
   // Create a new transaction and add the deposit instruction
