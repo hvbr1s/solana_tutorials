@@ -1,15 +1,13 @@
-const { Connection, PublicKey } = require('@solana/web3.js');
-const assert = require('assert');
-const { clusterApiUrl } = require('@solana/web3.js');
+import { Connection, PublicKey, clusterApiUrl, AccountInfo } from '@solana/web3.js';
+import assert from 'assert';
 
 describe('Solana Program Info Test', () => {
-
   const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
   const programId = new PublicKey('8p6eMVgc7TmwFHSKgvpVUdAs2anR6U7EqR7J8RtQy7Zq');
 
   it('should fetch and verify program information', async () => {
     // Fetch the program account info
-    const accountInfo = await connection.getAccountInfo(programId);
+    const accountInfo: AccountInfo<Buffer> | null = await connection.getAccountInfo(programId);
 
     // Assert that the account exists
     assert(accountInfo !== null, 'Program account should exist');
