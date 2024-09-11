@@ -59,25 +59,26 @@ test("simulate mint and ATA creation", async () => {
   
     // Access the test environment's client and fetch the raw account data
     const client = context.banksClient;
-    const rawAccount = await client.getAccount(ata);
+    const rawAccount = await client.getAccount(ata); // Get the token account data
   
     // Print the fetched account data to simulate the result
     console.log("Simulated ATA and Mint Account:", rawAccount?.owner.toBase58());
   });
 
 //////////////////////////////
+//////////////////////////////
+//////////////////////////////
+//////////////////////////////
 
 test("simulate custom program deposit with USDC to payer", async () => {
   // Define the correct program ID (public key) for the Manifest program
   const programId = new PublicKey("MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms");
-
   // Custom program object
   const customProgram : AddedProgram = {
     programId: programId,
     name: "manifest",
   };
-
-  // Find the function you want to call (assuming idl is defined elsewhere)
+  // Find the program function you want to call
   const depositInstruction = idl.instructions.find((ix) => ix.name === "Deposit");
   const instructionIndex = depositInstruction ? idl.instructions.indexOf(depositInstruction) : 2;
   console.log(`Deposit Instruction Index -> ${instructionIndex}`);
@@ -86,20 +87,22 @@ test("simulate custom program deposit with USDC to payer", async () => {
   const usdcMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
   const initialLamports = 1_000_000_000;
 
-  // Define the payer account with its initial state
-  const payerKeypair = Keypair.generate();
-  const payer : AddedAccount = {
-    address: payerKeypair.publicKey,
+  // Define the trader account with its initial state
+  const traderKeypair = Keypair.generate();
+  const traderPubKey =  new PublicKey(traderKeypair.publicKey)
+  console.log(`Trader PubKey -> ${traderPubKey}`)
+  const trader : AddedAccount = {
+    address: traderPubKey,
     info: {
-      data: Buffer.alloc(0),
+      data: Buffer.alloc(1000),
       executable: false,
       lamports: initialLamports,
       owner: SystemProgram.programId,
     },
   };
-
-  // Create the associated token account (ATA) for the payer
-  const payerATA = getAssociatedTokenAddressSync(usdcMint, payerKeypair.publicKey, true);
+  // Create the associated token account (ATA) for the trader
+  const traderATA = getAssociatedTokenAddressSync(usdcMint, traderPubKey, true);
+  console.log(`Trader ATA -> ${traderATA}`)
   
   // Encode token account data
   const ACCOUNT_SIZE = AccountLayout.span;
@@ -107,7 +110,7 @@ test("simulate custom program deposit with USDC to payer", async () => {
   AccountLayout.encode(
     {
       mint: usdcMint,
-      owner: payerKeypair.publicKey,
+      owner: traderPubKey,
       amount: 1_000_000_000_000n,
       delegateOption: 0,
       delegate: PublicKey.default,
@@ -121,9 +124,9 @@ test("simulate custom program deposit with USDC to payer", async () => {
     tokenAccData
   );
 
-  // Define the payer ATA with its initial state
+  // Define the trader ATA with its initial state
   const ATA : AddedAccount = {
-    address: payerATA,
+    address: traderATA,
     info: {
       data: tokenAccData,
       executable: false,
@@ -134,6 +137,8 @@ test("simulate custom program deposit with USDC to payer", async () => {
 
   // Define the market account with its initial state
   const marketKeypair = Keypair.generate();
+  const marketPubKey = new PublicKey(marketKeypair.publicKey)
+  console.log(`Market PubKey -> ${marketPubKey}`)
   const DISCRIMINANT = new BN("4859840929024028656");
   const marketAccountData = Buffer.alloc(1000);
   DISCRIMINANT.toArrayLike(Buffer, 'le', 8).copy(marketAccountData, 0);
@@ -143,7 +148,7 @@ test("simulate custom program deposit with USDC to payer", async () => {
       data: marketAccountData,
       executable: false,
       lamports: initialLamports,
-      owner: programId,
+      owner: programId, // Set the owner to the Manifest program ID
     },
   };
 
@@ -152,8 +157,9 @@ test("simulate custom program deposit with USDC to payer", async () => {
     [Buffer.from("vault"), marketKeypair.publicKey.toBuffer(), usdcMint.toBuffer()],
     programId
   );
+  console.log(`PDA PubKey -> ${vault.toBase58()}`)
 
-  // Initialize vault account
+  // Initialize vault account at PDA
   const vaultAccount :AddedAccount = {
     address: vault,
     info: {
@@ -165,17 +171,28 @@ test("simulate custom program deposit with USDC to payer", async () => {
   };
 
   // Start the test environment with the custom program, payer account, market account, and vault account
-  const context = await start([customProgram], [payer, market, ATA, vaultAccount]);
+  const context = await start([customProgram], [trader, market, ATA, vaultAccount]);
   const client = context.banksClient;
-  const latestBlockhash = context.lastBlockhash;
+
+  // Check initial account values
+  const initialTraderInfo = await client.getAccount(traderPubKey);
+  const initialMarketInfo = await client.getAccount(marketPubKey);
+  const initialTraderTokenInfo = await client.getAccount(traderPubKey);
+  const initialVaultInfo = await client.getAccount(vault);
+
+  console.log("Initial trader info:", initialTraderInfo);
+  console.log("Initial market info:", initialMarketInfo);
+  console.log("Initial trader token info:", initialTraderTokenInfo);
+  console.log("Initial vault info:", initialVaultInfo);
+
 
   // Create the deposit instruction
   const depositIx = {
     programId: programId,
     keys: [
-      { pubkey: payerKeypair.publicKey, isSigner: true, isWritable: true },
-      { pubkey: marketKeypair.publicKey, isSigner: false, isWritable: true },
-      { pubkey: payerATA, isSigner: false, isWritable: true },
+      { pubkey: traderPubKey, isSigner: true, isWritable: true },
+      { pubkey: marketPubKey, isSigner: false, isWritable: true },
+      { pubkey: traderATA, isSigner: false, isWritable: true },
       { pubkey: vault, isSigner: false, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: usdcMint, isSigner: false, isWritable: false },
@@ -184,10 +201,11 @@ test("simulate custom program deposit with USDC to payer", async () => {
   };
 
   // Create a new transaction and add the deposit instruction
+  const latestBlockhash = context.lastBlockhash;
   const tx = new Transaction().add(depositIx);
   tx.recentBlockhash = latestBlockhash;
-  tx.feePayer = payerKeypair.publicKey;
-  tx.sign(payerKeypair);
+  tx.feePayer = traderPubKey;
+  tx.sign(traderKeypair);
 
   // Process the transaction
   try {
@@ -200,12 +218,12 @@ test("simulate custom program deposit with USDC to payer", async () => {
     console.log("Transaction result:", txResult);
 
     // Fetch the updated account info
-    const updatedPayerInfo = await client.getAccount(payerKeypair.publicKey);
-    const updatedMarketInfo = await client.getAccount(marketKeypair.publicKey);
-    const updatedTraderTokenInfo = await client.getAccount(payerATA);
+    const updatedTraderInfo = await client.getAccount(traderPubKey);
+    const updatedMarketInfo = await client.getAccount(marketPubKey);
+    const updatedTraderTokenInfo = await client.getAccount(traderPubKey);
     const updatedVaultInfo = await client.getAccount(vault);
 
-    console.log("Updated payer info:", updatedPayerInfo);
+    console.log("Updated payer info:", updatedTraderInfo);
     console.log("Updated market info:", updatedMarketInfo);
     console.log("Updated trader token info:", updatedTraderTokenInfo);
     console.log("Updated vault info:", updatedVaultInfo);
