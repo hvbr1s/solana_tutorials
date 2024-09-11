@@ -170,8 +170,20 @@ test("simulate custom program deposit with USDC to payer", async () => {
     }
   };
 
+const feePayerKeypair = Keypair.generate();
+const feePayerPubKey = feePayerKeypair.publicKey
+const feePayer: AddedAccount = {
+  address: feePayerPubKey,
+  info: {
+    data: Buffer.alloc(0),
+    executable: false,
+    lamports: 1_000_000_000, // Ensure this is enough for fees
+    owner: SystemProgram.programId,
+  },
+};
+
   // Start the test environment with the custom program, payer account, market account, and vault account
-  const context = await start([customProgram], [trader, market, ATA, vault]);
+  const context = await start([customProgram], [trader, market, ATA, vault, feePayer]);
   const client = context.banksClient;
 
   // Check initial account values
@@ -196,6 +208,7 @@ test("simulate custom program deposit with USDC to payer", async () => {
       { pubkey: vaultPDA, isSigner: false, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: usdcMint, isSigner: false, isWritable: false },
+      { pubkey: feePayerPubKey, isSigner: false, isWritable: false },
     ],
     data: Buffer.from([instructionIndex]), 
   };
@@ -204,8 +217,8 @@ test("simulate custom program deposit with USDC to payer", async () => {
   const latestBlockhash = context.lastBlockhash;
   const tx = new Transaction().add(depositIx);
   tx.recentBlockhash = latestBlockhash;
-  tx.feePayer = traderPubKey;
-  tx.sign(traderKeypair);
+  tx.feePayer = feePayerPubKey;
+  tx.sign(traderKeypair, feePayerKeypair);
 
   // Process the transaction
   try {
