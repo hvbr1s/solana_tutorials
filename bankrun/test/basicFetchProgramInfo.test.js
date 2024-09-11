@@ -22,7 +22,5 @@ describe('Solana Program Info Test', () => {
     console.log('Owner:', accountInfo.owner.toBase58());
     console.log('Data length:', accountInfo.data.length);
     console.log('Lamports:', accountInfo.lamports);
-
-    // You can add more specific assertions based on what you expect from this program
   });
 });
