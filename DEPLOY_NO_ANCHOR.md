@@ -5,7 +5,7 @@
 ## Installed Prerequisites
 
 - Git 
-- Node.js and npm
+- Node.js and npm or yarn (preferred)
 - Cargo
 - Solana CLI
 
