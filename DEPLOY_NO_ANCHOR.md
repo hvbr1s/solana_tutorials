@@ -32,7 +32,7 @@
 
 4. Install Node.js dependencies:
    ```
-   npm install
+   yarn install
    ```
 
 5. Check the Rust version in `rust-toolchain.toml` file under `toolchain -> channel`.
@@ -76,8 +76,8 @@
    ```
 
    > **Note:** If you encounter an error about an outdated `rustc` version:
-   > - Check the Rust version used by the Solana CLI: `cargo build-sbf --version`
-   > - Update Solana to a newer version: `solana-install init <latest_version>`
+   > - Check your Solana's Rust version: `cargo build-sbf --version`
+   > - Update Solana: `solana-install init <latest_version>`
    > - Set workplace Rust version to "solana": 
    >   ```
    >   rustup default solana
@@ -112,3 +112,41 @@
 
 - After deploying your programs and generating the IDL and `.so` files, you can test them in near-live conditions using a TypeScript test suite like [BankRun](https://www.youtube.com/watch?v=2DVudyfP5bQ)
 - Please see [this code](https://github.com/hvbr1s/solana_tutorials/blob/main/bankrun/test/minimal.test.ts) for a basic example.
+
+# Testing Setup Instructions
+
+1. Install dependencies **in that exact order**:
+   ```
+   yarn add --dev mocha @types/mocha ts-node
+   yarn add @babel/preset-env @babel/preset-typescript
+   yarn add solana-bankrun
+   yarn add jest
+   ```
+
+2. Create a `./tests/fixtures` folder and copy your `.so` program files from `./target/deploy`.
+
+3. Add a custom test script to your `package.json` file:
+   ```json
+   {
+     "scripts": {
+       "test": "jest"
+     }
+   }
+   ```
+
+4. Create a `babel.config.js` file at the root of your project with the following content:
+   ```javascript
+   module.exports = {
+     presets: [
+       ['@babel/preset-env', { targets: { node: 'current' } }],
+       '@babel/preset-typescript'
+     ]
+   };
+   ```
+
+5. Create a separate `./test` folder for your custom TypeScript tests, e.g., `testWIP.test.ts`.
+
+6. Run your tests using:
+   ```
+   yarn test
+   ```
