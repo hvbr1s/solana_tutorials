@@ -76,17 +76,15 @@
    ```
 
    > **Note:** If you encounter an error about an outdated `rustc` version:
-   > - Check you Solana's Rust version: `cargo build-sbf --version`
+   > - Check your Solana's Rust version: `cargo build-sbf --version`
    > - Update Solana: `solana-install init <latest_version>`
-   > - Upgrade Rust: `rustup update stable`
-   > - Set workplace Rust version: 
+   > - Set workplace Rust version to "solana": 
    >   ```
-   >   rustup default <version>
-   >   rustup override set <version>
+   >   rustup default solana
+   >   rustup override set solana
    >   ```
-   > - Update `Cargo.toml` and `rust-toolchain.toml` with correct versions
-   > - Clean build cache by running `Cargo clean`
-   > - Retry the build commands `cargo build` then `cargo build-bpf --manifest-path=./Cargo.toml`
+   > - Retry `cargo build-bpf --manifest-path=./Cargo.toml`
+   > - If this doesn't work, clean the build cache by running `Cargo clean` then retry `cargo build-bpf --manifest-path=./Cargo.toml`
 
 2. Deploy the program:
    ```
