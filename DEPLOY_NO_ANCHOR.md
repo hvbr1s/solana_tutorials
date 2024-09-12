@@ -76,8 +76,8 @@
    ```
 
    > **Note:** If you encounter an error about an outdated `rustc` version:
-   > - Check your Solana's Rust version: `cargo build-sbf --version`
-   > - Update Solana: `solana-install init <latest_version>`
+   > - Check the Rust version used by the Solana CLI: `cargo build-sbf --version`
+   > - Update Solana to a newer version: `solana-install init <latest_version>`
    > - Set workplace Rust version to "solana": 
    >   ```
    >   rustup default solana
