@@ -42,9 +42,10 @@
    rustup install <version>
    ```
 
-7. Set the installed Rust version as default:
+7. Set the installed Rust version as default and make sure it overrides the workspace:
    ```
    rustup default <version>
+   rustup override set <version>
    ```
 
 8. Verify the Rust version in use:
