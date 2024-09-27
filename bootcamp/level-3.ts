@@ -1,13 +1,14 @@
 import * as anchor from '@coral-xyz/anchor';
 import { Program } from '@coral-xyz/anchor';
 import { Level3 } from '../target/types/level_3';
-import { web3 } from '@coral-xyz/anchor';
+import { web3, SystemProgram } from '@coral-xyz/anchor';
 import {
   getAssociatedTokenAddress,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
   createAssociatedTokenAccount,
   getAssociatedTokenAddressSync,
+  getMint
 } from '@solana/spl-token';
 
 export const originalMint = new web3.PublicKey("AsqdvXVEZaSFRNJ5ERSSUL5firH2KBhjP76tsYXB1eKK");
@@ -24,6 +25,7 @@ describe("level-3", () => {
   const customMint = web3.Keypair.generate();
 
   let FACTION_PDA = null
+  let NEW_MEMBER_ATA = null
 
   before("Fund the users!", async () => {
     await airdrop(provider.connection, newMember.publicKey);
@@ -63,10 +65,24 @@ describe("level-3", () => {
 
       FACTION_PDA = factionPDA
 
+      const mintInfo = await getMint(
+        provider.connection,
+        customMint.publicKey,
+        'confirmed',
+        TOKEN_2022_PROGRAM_ID
+      );
+
+      console.log("Mint Info:");
+      console.log("  Mint Authority:", mintInfo.mintAuthority?.toBase58());
+      console.log("  Supply:", mintInfo.supply.toString());
+      console.log("  Decimals:", mintInfo.decimals);
+      console.log("  Is initialized:", mintInfo.isInitialized);
+      console.log("  Freeze authority:", mintInfo.freezeAuthority?.toBase58());
+
     });
 
     it ("creates an TA for the new member", async () => {
-      const newMemberATA = await getAssociatedTokenAddress(
+      const newMemberATA = await getAssociatedTokenAddressSync(
         customMint.publicKey,
         newMember.publicKey
       );
@@ -84,21 +100,31 @@ describe("level-3", () => {
       await new Promise(resolve => setTimeout(resolve, 5000));
       const accountInfo = await provider.connection.getBalance(newMemberATA);
       console.log("Account Info:", accountInfo);
+
+      NEW_MEMBER_ATA = newMemberATA
+
     })
 
-    // it ("grabs the token", async () => {
+    it ("grabs the token", async () => {
 
-    //  const onbtainToken = await program.methods.obtainFactionToken()
-    //  .accounts({
-    //   factionAuthority: factionCreator.publicKey,
-    //   faction: FACTION_PDA,
-    //   mint: customMint.publicKey,
-    //   newMember: newMember.publicKey,
-    //   newMemberTokenAccount:
+      const obtainToken2 = await program.methods.obtainFactionToken()
+      .accounts({
+       factionAuthority: factionCreator.publicKey,
+       faction: FACTION_PDA,
+       mint: customMint.publicKey,
+       newMember: newMember.publicKey,
+       newMemberTokenAccount: NEW_MEMBER_ATA,
+       systemProgram: web3.SystemProgram.programId,
+       tokenProgram: TOKEN_2022_PROGRAM_ID,
+       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID
+      })
+      .signers([factionCreator, newMember])
+      .rpc({skipPreflight:true});
+     
+       await new Promise(resolve => setTimeout(resolve, 5000));
+       console.log("Obtain Token Transaction:", obtainToken2);
 
-    //  })
-
-    // });
+    });
 
   });
 
