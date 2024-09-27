@@ -32,7 +32,7 @@ describe("level-3", () => {
   });
 
   it("creates a new faction", async () => {
-        // Derive the faction PDA
+    // Derive the faction PDA
     const [factionPDA] = await web3.PublicKey.findProgramAddressSync(
       [Buffer.from("faction"), factionCreator.publicKey.toBuffer(), customMint.publicKey.toBuffer()],
       program.programId
@@ -60,33 +60,47 @@ describe("level-3", () => {
       const factionDetails = await provider.connection.getAccountInfo(factionPDA, {
         commitment: 'confirmed'
       })
-      console.log("Transaction details:", JSON.stringify(txDetails, null, 2));
-      console.log("Faction details", JSON.stringify(txDetails, null, 2))
 
-    // const obtainToken  = await program.methods.obtainFactionToken()
-    // .accounts({
+      FACTION_PDA = factionPDA
+
+    });
+
+    it ("creates an TA for the new member", async () => {
+      const newMemberATA = await getAssociatedTokenAddress(
+        customMint.publicKey,
+        newMember.publicKey
+      );
+      console.log(`New Member ATA -> ${newMemberATA}`)
+
+      const taCreate = await createAssociatedTokenAccount(
+        provider.connection,
+        newMember,
+        customMint.publicKey,
+        newMember.publicKey,
+        null,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
+      )
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      const accountInfo = await provider.connection.getBalance(newMemberATA);
+      console.log("Account Info:", accountInfo);
+    })
+
+    // it ("grabs the token", async () => {
+
+    //  const onbtainToken = await program.methods.obtainFactionToken()
+    //  .accounts({
     //   factionAuthority: factionCreator.publicKey,
     //   faction: FACTION_PDA,
     //   mint: customMint.publicKey,
     //   newMember: newMember.publicKey,
-    //   newMemberTokenAccount: newMemberATA,
-    //   systemProgram: web3.SystemProgram.programId,
-    //   tokenProgram: TOKEN_2022_PROGRAM_ID,
-    //   associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-    // })
-    // .signers([factionCreator, newMember])
-    // .rpc({skipPreflight: true});
+    //   newMemberTokenAccount:
 
-    // await new Promise(resolve => setTimeout(resolve, 5000));
+    //  })
 
-    // const txDetails = await provider.connection.getTransaction(obtainToken, {
-    //   maxSupportedTransactionVersion: 0, commitment:'confirmed'
     // });
-    // console.log("Transaction details:", JSON.stringify(txDetails, null, 2));
 
   });
-
-});
 
 async function airdrop(connection: any, address: any, amount = 10_000_000_000) {
   await connection.confirmTransaction(await connection.requestAirdrop(address, amount), "confirmed");
