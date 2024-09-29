@@ -4,12 +4,15 @@ import { Level3 } from '../target/types/level_3';
 import { web3, SystemProgram } from '@coral-xyz/anchor';
 import {
   getAssociatedTokenAddress,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
+  // ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
   createAssociatedTokenAccount,
   getAssociatedTokenAddressSync,
-  getMint
+  getMint,
+  getAccount,
+  createMintToInstruction
 } from '@solana/spl-token';
+import * as spl from "@solana/spl-token";
 
 export const originalMint = new web3.PublicKey("AsqdvXVEZaSFRNJ5ERSSUL5firH2KBhjP76tsYXB1eKK");
 export const originalFactionCreator = new web3.PublicKey("4A4cPZgQx2cZ3aejRLCMSX5839gVM3Gjrii2nxfGVwVj");
@@ -19,112 +22,91 @@ describe("level-3", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
   const program = anchor.workspace.Level3 as Program<Level3>;
+  const ASSOCIATED_TOKEN_PROGRAM_ID_2022 = new web3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+  const SECRET = "eecc857933d8929d484d89618dde031e09183e4cc4dbe954a9055070b332983a";
 
   const newMember = web3.Keypair.generate();
   const factionCreator = web3.Keypair.generate();
-  const customMint = web3.Keypair.generate();
+  const payer = web3.Keypair.generate()
+  const mockProgram = new web3.PublicKey('5zjbNpnsSkCNG6zHzK183ujm6dn6fWeHWeUnk1Rzrs1Y')
+ 
+
+  console.log("New Member Public Key:", newMember.publicKey.toString());
+  console.log("Faction Creator Public Key:", factionCreator.publicKey.toString());
 
   let FACTION_PDA = null
   let NEW_MEMBER_ATA = null
+  let CUSTOM_MINT = null
 
   before("Fund the users!", async () => {
     await airdrop(provider.connection, newMember.publicKey);
     await airdrop(provider.connection, factionCreator.publicKey);
-    await airdrop(provider.connection, customMint.publicKey);
-  });
-
-  it("creates a new faction", async () => {
-    // Derive the faction PDA
-    const [factionPDA] = await web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("faction"), factionCreator.publicKey.toBuffer(), customMint.publicKey.toBuffer()],
-      program.programId
-    );
-
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    console.log(`Faction PDA -> ${factionPDA}`)
-
-      // Initialize the faction
-      const initializeFaction =  await program.methods.initialize("Test Faction", "TEST")
-      .accounts({
-        factionCreator: factionCreator.publicKey,
-        faction: factionPDA,
-        mint: customMint.publicKey,
-        systemProgram: web3.SystemProgram.programId,
-        tokenProgram: TOKEN_2022_PROGRAM_ID,
-      })
-      .signers([factionCreator, customMint ])
-      .rpc();
-
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      const txDetails = await provider.connection.getTransaction(initializeFaction, {
-        maxSupportedTransactionVersion: 0, commitment:'confirmed'
-      });
-      const factionDetails = await provider.connection.getAccountInfo(factionPDA, {
-        commitment: 'confirmed'
-      })
-
-      FACTION_PDA = factionPDA
-
-      const mintInfo = await getMint(
-        provider.connection,
-        customMint.publicKey,
-        'confirmed',
-        TOKEN_2022_PROGRAM_ID
-      );
-
-      console.log("Mint Info:");
-      console.log("  Mint Authority:", mintInfo.mintAuthority?.toBase58());
-      console.log("  Supply:", mintInfo.supply.toString());
-      console.log("  Decimals:", mintInfo.decimals);
-      console.log("  Is initialized:", mintInfo.isInitialized);
-      console.log("  Freeze authority:", mintInfo.freezeAuthority?.toBase58());
-
+    await airdrop(provider.connection, payer.publicKey);
     });
 
-    it ("creates an TA for the new member", async () => {
-      const newMemberATA = await getAssociatedTokenAddressSync(
-        customMint.publicKey,
-        newMember.publicKey
-      );
-      console.log(`New Member ATA -> ${newMemberATA}`)
+    it("creates a new faction", async () => {
 
-      const taCreate = await createAssociatedTokenAccount(
+        const customMint = web3.Keypair.generate();
+        // Derive the faction PDA
+        const [factionPDA] = await web3.PublicKey.findProgramAddressSync(
+          [Buffer.from("faction"), newMember.publicKey.toBuffer(), customMint.publicKey.toBuffer()],
+          program.programId
+        );
+    
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log(`Faction PDA -> ${factionPDA}`)
+        console.log("Custom Mint created:", factionPDA.toString());
+        await airdrop(provider.connection, factionPDA, 1000000)
+        
+        await new Promise(resolve => setTimeout(resolve, 2000));
+          FACTION_PDA = factionPDA
+          CUSTOM_MINT = factionPDA
+    
+        });
+
+
+    it ("creates an ATA for the new member", async () => {
+
+        const newMemberATA = await getAssociatedTokenAddressSync(
+        originalMint,
+        newMember.publicKey
+        );
+        console.log(`New Member ATA -> ${newMemberATA}`)
+
+        await createAssociatedTokenAccount(
         provider.connection,
-        newMember,
-        customMint.publicKey,
-        newMember.publicKey,
+        payer,
+        originalMint,
+        mockProgram,
         null,
         TOKEN_2022_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID
-      )
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      const accountInfo = await provider.connection.getBalance(newMemberATA);
-      console.log("Account Info:", accountInfo);
+        ASSOCIATED_TOKEN_PROGRAM_ID_2022
+        )
+        await new Promise(resolve => setTimeout(resolve, 5000));
 
-      NEW_MEMBER_ATA = newMemberATA
-
-    })
-
-    it ("grabs the token", async () => {
-
-      const obtainToken2 = await program.methods.obtainFactionToken()
-      .accounts({
-       factionAuthority: factionCreator.publicKey,
-       faction: FACTION_PDA,
-       mint: customMint.publicKey,
-       newMember: newMember.publicKey,
-       newMemberTokenAccount: NEW_MEMBER_ATA,
-       systemProgram: web3.SystemProgram.programId,
-       tokenProgram: TOKEN_2022_PROGRAM_ID,
-       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID
-      })
-      .signers([factionCreator, newMember])
-      .rpc({skipPreflight:true});
-     
-       await new Promise(resolve => setTimeout(resolve, 5000));
-       console.log("Obtain Token Transaction:", obtainToken2);
-
+        NEW_MEMBER_ATA = newMemberATA
+        console.log(`Checkpoint -> ${NEW_MEMBER_ATA}`)
     });
+
+    it ("shows faction secret", async () =>{
+
+      console.log(FACTION_PDA)
+      console.log(CUSTOM_MINT)
+      console.log(NEW_MEMBER_ATA)
+
+      const hack = await program.methods.showFactionSecret(SECRET)
+      .accounts({
+        factionMember: newMember.publicKey,
+        faction: FACTION_PDA,
+        memberTokenAccount: NEW_MEMBER_ATA,
+        mint: CUSTOM_MINT
+      })
+      .signers([newMember])
+      .rpc()
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      console.log(hack)
+        
+      })
 
   });
 
