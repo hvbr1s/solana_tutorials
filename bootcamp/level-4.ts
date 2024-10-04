@@ -56,24 +56,43 @@ describe("level-4", async () => {
 
   it('Creates a mock Escrow account', async () => {
 
-    // Use a dummy public key as the recipient
-    const recipient = anchor.web3.Keypair.generate().publicKey;
-
-    // Create the mock Escrow account
+    const mockEscrowKeypair = anchor.web3.Keypair.generate();
+    console.log(`Mock Escrow PubKey -> ${mockEscrowKeypair.publicKey}`)
+    const startTime = new anchor.BN(Math.floor(Date.now() / 1000)); // Current timestamp
+    const interval = new anchor.BN(1); // Smallest possible interval (1 second)
+    const endTime = startTime.add(new anchor.BN(10));
+  
     const mockEscrow = {
-      recipient: ESCROW_RECIPIENT,
+      recipient: HACKER_TOKEN_ACCOUNT,
       mint: USDC,
       amount: new anchor.BN('2001000'),
       withdrawal: new anchor.BN('0'), 
-      startTime: new anchor.BN('0'),
-      endTime: new anchor.BN('1'),
-      interval: new anchor.BN('1'),
-    };
+      startTime: startTime,
+      endTime: endTime,
+      interval: interval,
+    };  
+    // Calculate the space required for the account
+    const ESCROW_SIZE = 8 + 32 + 100;
+  
+    // Create the account
+    const createAccountInstruction = anchor.web3.SystemProgram.createAccount({
+      fromPubkey: provider.wallet.publicKey,
+      newAccountPubkey: mockEscrowKeypair.publicKey,
+      space: ESCROW_SIZE,
+      lamports: 1000000000,
+      programId: web3.SystemProgram.programId,
+    });
+    console.log(createAccountInstruction)
 
-    // Log the mock account for verification
-    console.log('Mock Escrow account:', mockEscrow);
+    // send transaction
+    const transaction = new anchor.web3.Transaction()
+    .add(createAccountInstruction)
+    
+    const signature = await provider.sendAndConfirm(transaction, [mockEscrowKeypair]);
+    console.log('Mock Escrow account created successfully. Signature:', signature);
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    attackEscrow =  mockEscrow
+    attackEscrow = mockEscrowKeypair.publicKey;
   });
 
   it('derives ATA for hacker', async () => {
