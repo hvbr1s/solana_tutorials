@@ -22,7 +22,7 @@ const SENDER_TOKEN_ACCOUNT = new web3.PublicKey("2CoFvgSNNV7oZcujdPV7Pe79GUdBuLk
 // v v v v v v v v v v v v v v v v v v v v v
 
 
-const SECRET = "69c5c9e5f885370d387e0d019c48f1629ab7cbfeb29e628dcebe2f78b0c2dacd"
+const SECRET = ""
 
 
 // ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
