@@ -192,48 +192,6 @@ describe("level-4", async () => {
 
   })
 
-
-  // it("Reveals secrets", async () => {
-
-  //   const airdropSignature = await provider.connection.requestAirdrop(
-  //     hacker.publicKey,
-  //     1000000000 // 1 SOL
-  //   );
-  //   await provider.connection.confirmTransaction(airdropSignature);
-  //   // Create the transaction
-  //   const tx = await program.methods.revealSecret(SECRET)
-  //     .accounts({
-  //       hacker: hacker.publicKey,
-  //       hackerTokenAccount: HACKER_TOKEN_ACCOUNT,
-  //       mint: USDC
-  //     })
-  //     .transaction();
-  
-  //   // Sign the transaction
-  //   tx.feePayer = hacker.publicKey;
-  //   tx.recentBlockhash = (await provider.connection.getLatestBlockhash()).blockhash;
-  //   tx.sign(hacker);
-  
-  //   // Send the transaction
-  //   const txid = await provider.connection.sendRawTransaction(tx.serialize());
-    
-  //   // Wait for confirmation
-  //   const confirmation = await provider.connection.confirmTransaction(txid);
-    
-  //   console.log("Transaction confirmed. Signature:", txid);
-  
-  //   // Optional: Fetch the transaction details
-  //   const txDetails = await provider.connection.getTransaction(txid, {
-  //     commitment: 'confirmed',
-  //     maxSupportedTransactionVersion: 0
-  //   });
-  //   // Wait for 2 seconds (if still needed)
-  //   await new Promise(resolve => setTimeout(resolve, 5000));
-  
-  //   console.log("Transaction details:", txDetails);
-  
-  // });
-
   it("Bug evaluation", async () => {
 
 
